@@ -164,5 +164,18 @@ export async function PATCH(req: NextRequest, context: any) {
   }
 }
 
-// Export other methods without modification
-export const { GET, DELETE } = commentHandler
+type CommentRouteContext = { params: Promise<{ comment?: string[] }> }
+
+// Next.js allows an absent segment for [[...comment]]; Fuma expects an array.
+async function normalizeCommentContext(context: CommentRouteContext) {
+  const { comment } = await context.params
+  return { params: Promise.resolve({ comment: comment ?? [] }) }
+}
+
+export async function GET(req: NextRequest, context: CommentRouteContext) {
+  return commentHandler.GET(req, await normalizeCommentContext(context))
+}
+
+export async function DELETE(req: NextRequest, context: CommentRouteContext) {
+  return commentHandler.DELETE(req, await normalizeCommentContext(context))
+}

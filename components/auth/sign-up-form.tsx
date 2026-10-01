@@ -10,6 +10,7 @@ import { useForm } from "react-hook-form"
 import { toast } from "sonner"
 
 import { oneTap, signIn, signUp } from "@/lib/auth-client"
+import { localAuthEnabled } from "@/lib/local-auth"
 import { SignUpFormData, signUpSchema } from "@/lib/validations/auth"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -52,7 +53,7 @@ export function SignUpForm() {
   }
 
   const handleSignUp = async (data: SignUpFormData) => {
-    if (!turnstileToken) {
+    if (!localAuthEnabled && !turnstileToken) {
       setGeneralError("Please complete the security verification")
       return
     }
@@ -64,7 +65,7 @@ export function SignUpForm() {
       callbackURL: "/verify-email/success",
       fetchOptions: {
         headers: {
-          "x-captcha-response": turnstileToken,
+          ...(!localAuthEnabled && turnstileToken ? { "x-captcha-response": turnstileToken } : {}),
         },
       },
     }
@@ -73,8 +74,12 @@ export function SignUpForm() {
       setLoadingButtons((prevState) => ({ ...prevState, email: true }))
       setGeneralError(null)
 
-      await signUp.email(options)
-      router.push("/verify-email/sent")
+      const result = await signUp.email(options)
+      if (result.error) {
+        setGeneralError(result.error.message || "Unable to create account")
+        return
+      }
+      router.push(localAuthEnabled ? "/dashboard" : "/verify-email/sent")
     } catch (error) {
       setGeneralError(error instanceof Error ? error.message : "An error occurred")
     } finally {
@@ -83,6 +88,7 @@ export function SignUpForm() {
   }
 
   useEffect(() => {
+    if (localAuthEnabled) return
     oneTap({
       fetchOptions: {
         onError: ({ error }) => {
@@ -110,7 +116,7 @@ export function SignUpForm() {
               variant="outline"
               type="button"
               onClick={() => handleLogin("google")}
-              disabled={loadingButtons.google}
+              disabled={localAuthEnabled || loadingButtons.google}
             >
               <RiGoogleFill className="me-1" size={16} aria-hidden="true" />
               {loadingButtons.google ? "Loading..." : "Login with Google"}
@@ -120,7 +126,7 @@ export function SignUpForm() {
               variant="outline"
               type="button"
               onClick={() => handleLogin("github")}
-              disabled={loadingButtons.github}
+              disabled={localAuthEnabled || loadingButtons.github}
             >
               <RiGithubFill className="me-1" size={16} aria-hidden="true" />
               {loadingButtons.github ? "Loading..." : "Login with GitHub"}
@@ -167,7 +173,7 @@ export function SignUpForm() {
               <Button
                 type="submit"
                 className="w-full cursor-pointer"
-                disabled={loadingButtons.email || !turnstileToken}
+                disabled={loadingButtons.email || (!localAuthEnabled && !turnstileToken)}
               >
                 {loadingButtons.email ? "Creating account..." : "Create account"}
               </Button>

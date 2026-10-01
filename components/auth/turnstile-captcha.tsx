@@ -4,6 +4,8 @@ import { useRef } from "react"
 
 import { Turnstile } from "@marsidev/react-turnstile"
 
+import { localAuthEnabled } from "@/lib/local-auth"
+
 interface TurnstileCaptchaProps {
   onVerify: (token: string) => void
 }
@@ -12,12 +14,12 @@ export function TurnstileCaptcha({ onVerify }: TurnstileCaptchaProps) {
   const siteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY
   const ref = useRef(null)
 
+  if (localAuthEnabled) return null
+
   if (!siteKey) {
     console.error("Turnstile site key is not defined")
     return null
   }
-
-  if (process.env.NODE_ENV === "development") return null
 
   return (
     <div className="flex justify-center">

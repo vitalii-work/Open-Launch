@@ -10,6 +10,7 @@ import { useForm } from "react-hook-form"
 import { toast } from "sonner"
 
 import { oneTap, signIn } from "@/lib/auth-client"
+import { localAuthEnabled } from "@/lib/local-auth"
 import { SignInFormData, signInSchema } from "@/lib/validations/auth"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -52,7 +53,7 @@ export function SignInForm() {
   }
 
   const handleLoginEmail = async (data: SignInFormData) => {
-    if (!turnstileToken) {
+    if (!localAuthEnabled && !turnstileToken) {
       setGeneralError("Please complete the security verification")
       return
     }
@@ -63,7 +64,7 @@ export function SignInForm() {
       callbackURL: "/dashboard",
       fetchOptions: {
         headers: {
-          "x-captcha-response": turnstileToken,
+          ...(!localAuthEnabled && turnstileToken ? { "x-captcha-response": turnstileToken } : {}),
         },
       },
     }
@@ -86,6 +87,7 @@ export function SignInForm() {
   }
 
   useEffect(() => {
+    if (localAuthEnabled) return
     oneTap({
       fetchOptions: {
         onError: ({ error }) => {
@@ -115,7 +117,7 @@ export function SignInForm() {
               variant="outline"
               type="button"
               onClick={() => handleLogin("google")}
-              disabled={loadingButtons.google}
+              disabled={localAuthEnabled || loadingButtons.google}
             >
               <RiGoogleFill className="me-1" size={16} aria-hidden="true" />
               {loadingButtons.google ? "Loading..." : "Login with Google"}
@@ -125,7 +127,7 @@ export function SignInForm() {
               variant="outline"
               type="button"
               onClick={() => handleLogin("github")}
-              disabled={loadingButtons.github}
+              disabled={localAuthEnabled || loadingButtons.github}
             >
               <RiGithubFill className="me-1" size={16} aria-hidden="true" />
               {loadingButtons.github ? "Loading..." : "Login with GitHub"}
@@ -170,7 +172,7 @@ export function SignInForm() {
               <Button
                 type="submit"
                 className="w-full cursor-pointer"
-                disabled={loadingButtons.email || !turnstileToken}
+                disabled={loadingButtons.email || (!localAuthEnabled && !turnstileToken)}
               >
                 {loadingButtons.email ? "Logging in..." : "Login"}
               </Button>

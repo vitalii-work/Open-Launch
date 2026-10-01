@@ -6,8 +6,9 @@ import { admin, captcha, oneTap } from "better-auth/plugins"
 import Stripe from "stripe"
 
 import { sendEmail } from "@/lib/email"
+import { localAuthEnabled } from "@/lib/local-auth"
 
-const stripeClient = new Stripe(process.env.STRIPE_SECRET_KEY!)
+const stripeClient = localAuthEnabled ? null : new Stripe(process.env.STRIPE_SECRET_KEY!)
 
 export const auth = betterAuth({
   database: drizzleAdapter(db, {
@@ -15,7 +16,7 @@ export const auth = betterAuth({
   }),
   emailAndPassword: {
     enabled: true,
-    requireEmailVerification: true,
+    requireEmailVerification: !localAuthEnabled,
     sendResetPassword: async ({ user, url }) => {
       const html = `
         <p>Hello ${user.name},</p>
@@ -36,9 +37,11 @@ export const auth = betterAuth({
       })
     },
   },
-  emailVerification: {
-    sendVerificationEmail: async ({ user, url }) => {
-      const html = `
+  emailVerification: localAuthEnabled
+    ? undefined
+    : {
+        sendVerificationEmail: async ({ user, url }) => {
+          const html = `
         <p>Hello ${user.name},</p>
         <p>Click the link below to verify your email address:</p>
         <a href="${url}" style="padding: 10px 20px; background-color: #000; color: #fff; text-decoration: none; border-radius: 5px;">
@@ -50,43 +53,49 @@ export const auth = betterAuth({
         <p>If you didn't create an account, please ignore this email.</p>
       `
 
-      await sendEmail({
-        to: user.email,
-        subject: "Verify your email address",
-        html,
-      })
-    },
-    expiresIn: 86400,
-  },
-  socialProviders: {
-    google: {
-      clientId: process.env.GOOGLE_CLIENT_ID as string,
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET as string,
-    },
-    github: {
-      clientId: process.env.GITHUB_CLIENT_ID as string,
-      clientSecret: process.env.GITHUB_CLIENT_SECRET as string,
-    },
-  },
+          await sendEmail({
+            to: user.email,
+            subject: "Verify your email address",
+            html,
+          })
+        },
+        expiresIn: 86400,
+      },
+  socialProviders: localAuthEnabled
+    ? {}
+    : {
+        google: {
+          clientId: process.env.GOOGLE_CLIENT_ID as string,
+          clientSecret: process.env.GOOGLE_CLIENT_SECRET as string,
+        },
+        github: {
+          clientId: process.env.GITHUB_CLIENT_ID as string,
+          clientSecret: process.env.GITHUB_CLIENT_SECRET as string,
+        },
+      },
   trustedOrigins: [
     process.env.NODE_ENV !== "development"
       ? "https://www.open-launch.com"
       : "http://localhost:3000",
   ],
   plugins: [
-    stripe({
-      stripeClient,
-      stripeWebhookSecret: process.env.STRIPE_WEBHOOK_SECRET!,
-      createCustomerOnSignUp: true,
-    }),
-    captcha({
-      provider: "cloudflare-turnstile", // or "google-recaptcha"
-      secretKey: process.env.TURNSTILE_SECRET_KEY!,
-      endpoints: ["/sign-up/email", "/sign-in/email", "/forget-password"],
-    }),
-    oneTap({
-      clientId: process.env.NEXT_PUBLIC_ONE_TAP_CLIENT_ID!,
-    }),
+    ...(localAuthEnabled
+      ? []
+      : [
+          stripe({
+            stripeClient: stripeClient!,
+            stripeWebhookSecret: process.env.STRIPE_WEBHOOK_SECRET!,
+            createCustomerOnSignUp: true,
+          }),
+          captcha({
+            provider: "cloudflare-turnstile", // or "google-recaptcha"
+            secretKey: process.env.TURNSTILE_SECRET_KEY!,
+            endpoints: ["/sign-up/email", "/sign-in/email", "/forget-password"],
+          }),
+          oneTap({
+            clientId: process.env.NEXT_PUBLIC_ONE_TAP_CLIENT_ID!,
+          }),
+        ]),
     admin({}),
   ],
 })

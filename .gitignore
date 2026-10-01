@@ -47,3 +47,6 @@ next-env.d.ts
 # blog
 blog-article.ts
 seo-article.ts
+
+# Project-local database servers, data, and logs
+/.local/

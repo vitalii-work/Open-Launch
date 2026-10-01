@@ -11,6 +11,11 @@ const nextConfig: NextConfig = {
   images: {
     remotePatterns: [
       {
+        // Existing sponsor card images use this UploadThing host.
+        protocol: "https",
+        hostname: "yxucdfr9f5.ufs.sh",
+      },
+      {
         protocol: "https",
         hostname: "yt3.googleusercontent.com",
       },
